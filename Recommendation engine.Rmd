@@ -1,0 +1,144 @@
+---
+title: "R Recommendation engine"
+output: html_notebook
+---
+
+#Recommendation engine concept
+
+Source: https://www.data-mania.com/blog/how-to-build-a-recommendation-engine-in-r/
+
+
+Is an automated decision engine that evaluates similarities between people and/or items in order to make recommendations about what items go well together.Most common application is ecommerce: buyers are satisfied with an ideal combination of products and sellers are happy because more sales and a higher ROI.
+
+Collaborative filtering algorithms uses data from users in the same platform to make predictions about items that have strong history of being purchased together. There are two types: User-based collaborative (depending or similar profiles) or item-based collaborative (similarities between items).
+
+advantages: niche items could be suggested, products from different category could be suggested, only based on rating on items could suggest items purchased by similar users.
+
+Not only looking at how many times an item was bought, but recommending rated high by similar users. Real-life recommenders hybridize the techniques and could get complex using solid reasoning to get best logic decisions.
+
+ML algorithms: clustering. Depends of project objectives.
+
+Another type is content-based recommenders when there is not much data available.  
+
+
+data: https://grouplens.org/datasets/movielens/
+demo: http://files.grouplens.org/datasets/movielens/ml-latest-small.zip
+
+#coding 
+
+```{r}
+##set working directory
+
+setwd("C:/Users/Moanesga/Desktop/Projects/Recommendation engine/ml-latest-small/")
+
+movies = read.csv(file = "movies.csv")
+links = read.csv("links.csv")
+ratings = read.csv("ratings.csv")
+tags = read.csv("tags.csv")
+
+#head(tags)
+
+```
+
+#Import the reshape2 library. 
+#Use the file install.packages("reshape2") if the package is not already installed
+
+```{r}
+#install.packages("reshape2", dependencies = TRUE)
+#install.packages("stringi", dependencies = TRUE)
+
+library(stringi)
+library(reshape2)
+```
+
+#Create ratings matrix with rows as users and columns as movies. We don't need timestamp
+```{r}
+ratingmat = dcast(ratings, userId~movieId, value.var ="rating",na.rm = FALSE)
+```
+#Removing users ids
+```{r}
+ratingmat = as.matrix(ratingmat[,-1])
+```
+#The recommendation package in R: recommenderlab. 
+It provides a UBCF Model (User Based Collaborative Filtering)
+Calculaing similarity among user ratings through the following methods: Jaccard similarity, Cosine similarity or Pearson similarity. 
+
+#Using cosine similarity
+
+```{r}
+#Installing the package recommenderlab
+install.packages("recommenderlab", dependencies= TRUE)
+library(recommenderlab)
+```
+
+#Reducing size of ratings matrix for faster computation
+before reducing size 45.8 Mb, it is called a "sparse matrix"
+due to the large number of zeros, by removing them it is transform in a "dense matrix"
+
+#Converting rating matrix to real rating matrix which makes it dense
+```{r}
+ratingmat = as(ratingmat, "realRatingMatrix")
+```
+Size of the matrix is now 1.7 Mb
+Next step is normalize the matrix so recommendations come out unbiased.
+
+#Normalize the ratings matrix
+```{r}
+ratingmat = normalize(ratingmat)
+```
+The recommender model of recommenderlab package is Recommender()
+
+```{r}
+#Reading about Recommender function
+?Recommender
+```
+
+#Building the model
+```{r}
+#Create Recommender Model
+#The parameters are UBCF and Cosine similarity.
+# Taking 10 nearest neighbours
+
+rec_mod = Recommender(ratingmat, method="UBCF", param = list(method = "Cosine", nn=10))
+
+```
+
+#Making predictions
+starting with the first user 
+```{r}
+#Obtain top 5 recommendations for 1st user entry in dataset
+Top_5_pred = predict(rec_mod, ratingmat[1], n=5)
+```
+
+To see the predictions of the model, convert them in a list and print them out:
+```{r}
+Top_5_List = as(Top_5_pred, "list")
+Top_5_List
+
+```
+The results are in movieId format.Using the movies dataset, we can check the movie titles maping from movieId. 
+```{r}
+#installing package "dplyr" 
+# Using R version 3.5.0 to be able to run package "plyr"
+install.packages("dplyr")
+library(dplyr)
+```
+```{r}
+#Converting the list into a dataframe, changing column name to movieId
+Top_5_df = data.frame(Top_5_List)
+colnames(Top_5_df) = "movieId"
+
+#since movieId is of the type integer in Movies data
+#Typecasting id in the recommendations as well
+Top_5_df$movieId = as.numeric(levels(Top_5_df$movieId))
+
+#Merge the movie ids with names to get titles and genres
+#install.packages("join", dependencies= TRUE)
+names = left_join(Top_5_df, movies, by= "movieId")
+
+#Print the titles and genres
+names
+
+```
+Conclusion: considering similarity between users, the model recommends 
+the movies listed above, where it can be seen the year of the movie released, and the movie genres.  
